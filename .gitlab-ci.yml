@@ -9,13 +9,13 @@ stages:
     stage: build
     script:
         - set PATH=%TOOLS%;%PATH% 
-        - qmake CONFIG+=release BUILD_FLAGS="program unittests" 
+        - qmake CONFIG+=release
         - jom -j24        
 
     artifacts:
         name: "libqticsneocanbus_dll_Qt%QT_VER%_Rev%REVISION%_Build%CI_PIPELINE_ID%"
         paths:
-        - libqticsneocanbus.dll 
+        - plugins/canbus/libqticsneocanbus.dll 
         expire_in: 2 days 
        
 
