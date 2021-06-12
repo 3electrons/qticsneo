@@ -106,7 +106,7 @@ win32-gcc{
 }
 
 win32-msvc*{
-   CONFIG+=  /Zc:strictStrings-   #thid-party/wincap/pcap.cpp generated C2664 error
+   QMAKE_CXXFLAGS+=  /Zc:strictStrings-   #thid-party/wincap/pcap.cpp generated C2664 error
 }
 
 win32{
