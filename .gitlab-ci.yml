@@ -1,5 +1,6 @@
-include: '.variables.yml' 
-
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  
 stages:
     - build
     - package
