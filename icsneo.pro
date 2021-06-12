@@ -105,9 +105,13 @@ win32-gcc{
     CONFIG+= object_parallel_to_source
 }
 
+win32-msvc*{
+   CONFIG+=  /Zc:strictStrings-   #thid-party/wincap/pcap.cpp generated C2664 error
+}
+
 win32{
 
-    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN  /Zc:strictStrings-  # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
+    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN   # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
     INCLUDEPATH    +=   libicsneo/third-party/optional-lite/include \
                         libicsneo/third-party/winpcap/include
 
