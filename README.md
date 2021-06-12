@@ -42,7 +42,7 @@ The dependencies are as follows:
 ### Still TODO
 - Support for multiple channels (only one channel supported at the noment) 
 - Verbose logging 
-- Shadow building 
+- ~~Shadow building~~
 - Verify channel distinguish when starting or multiplexing particular device and add channel support 
 - Verification of bitrate according to icsneo enum types
 - Remove incoming event handler as it is not needed 
