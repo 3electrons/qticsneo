@@ -31,8 +31,7 @@ PLUGIN_TYPE = canbus
 PLUGIN_CLASS_NAME = IcsNeoCanBusPlugin
 TARGET = qticsneocanbus
 TEMPLATE = lib
-CONFIG += plugin object_parallel_to_source
-
+CONFIG += plugin
 DESTDIR = plugins/canbus
 DISTFILES = icsneo.json
 
@@ -70,7 +69,8 @@ unix{
      QMAKE_CXXFLAGS += -Wno-sign-compare -Wno-unused-parameter -Wno-switch -Wno-missing-field-initializers -Wno-implicit-fallthrough  #to get rid of annnoying icsneo warrnings
      QMAKE_CFLAGS = $$QMAKE_CXXFLAGS
 
-     CONFIG    += link_pkgconfig
+     CONFIG    += link_pkgconfig object_parallel_to_source
+
      PKGCONFIG += libpcap
 
      #LIBS+=             libicsneo/build/third-party/libftdi/src/libftdi1.a
@@ -100,23 +100,23 @@ unix{
 }
 
 win32-gcc{
-    QMAKE_CXXFLAGS += -Wno-sign-compare -Wno-unused-parameter -Wno-switch -Wno-missing-field-initializers -Wimplicit-fallthrough=0  #to get rid of annnoying icsneo warrnings
+    QMAKE_CXXFLAGS += -std=c++17 -Wno-sign-compare -Wno-unused-parameter -Wno-switch -Wno-missing-field-initializers -Wimplicit-fallthrough=0  #to get rid of annnoying icsneo warrnings
     QMAKE_CFLAGS = $$QMAKE_CXXFLAGS
+    CONFIG+= object_parallel_to_source
 }
 
 win32{
 
-    BUILD_FLAGS = 3rd_ftdi
-    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN -std=c++17   # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
+    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN    # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
     INCLUDEPATH    +=   libicsneo/third-party/optional-lite/include \
                         libicsneo/third-party/winpcap/include
 
     ICSNEO_SOURCES +=   libicsneo/platform/windows/internal/pcapdll.cpp \
                         libicsneo/platform/windows/pcap.cpp \
-                        libicsneo/platform/windows/registry.cpp \
-                        libicsneo/platform/windows/vcp.cpp
+                        libicsneo/platform/windows/vcp.cpp \
+                        libicsneo/platform/windows/registry.cpp
 
-    LIBS+= -liphlpapi
+    LIBS+= -liphlpapi  -lAdvapi32
 }
 
 
