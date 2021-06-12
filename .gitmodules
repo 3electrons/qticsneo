@@ -1,0 +1,3 @@
+[submodule "libicsneo"]
+	path = libicsneo
+	url = https://github.com/3electrons/libicsneo.git
