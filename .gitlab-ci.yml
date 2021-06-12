@@ -27,7 +27,6 @@ build_qt5.15.2_MinGw_32:
 build_qt5.14.2_MSVC: 
     <<: *windows_build 
     tags: ["msvc2017_64_qt5.14.2"]
-	
 
  
         
