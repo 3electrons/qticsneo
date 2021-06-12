@@ -105,7 +105,7 @@ HEADERS += icsneo_plugin.h \
            icsneocanbackend_p.h
 
 SOURCES += icsneocanbackend.cpp \
-            $$ICSNEO_SOURCES \
+            $$ICSNEO_SOURCES  
 
 
 
