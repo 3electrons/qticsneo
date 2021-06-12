@@ -15,7 +15,7 @@ stages:
     artifacts:
         name: "libqticsneocanbus_dll_Qt%QT_VER%_Rev%REVISION%_Build%CI_PIPELINE_ID%"
         paths:
-        - plugins/canbus/libqticsneocanbus.dll 
+        - plugins/canbus/qticsneocanbus.dll 
         expire_in: 2 days 
        
 
