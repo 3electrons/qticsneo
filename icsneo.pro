@@ -6,7 +6,7 @@
 # By libicsneo - github page: "It is also possible to use the precompiled binaries with runtime linking. It is not recommended or supported to
 # attempt to use the C++ interface with dynamic linking due to the complexities of C++ compilers."
 
-# Hence current form. As bouns mingw is supported.
+# Hence current form. As bouns MinGw is supported.
 # Dependencies:
 # - libusb-1.0
 # - libpcap
@@ -21,12 +21,10 @@
 
 # Remarks:
 # Shadow building is not supported
+# generated directory - contains preconfigured files - to avoid cmake usage
 
 QT = core serialbus
-
-
 BUILD_FLAGS = 3rd_ftdi
-
 PLUGIN_TYPE = canbus
 PLUGIN_CLASS_NAME = IcsNeoCanBusPlugin
 TARGET = qticsneocanbus
