@@ -416,10 +416,12 @@ bool IcsNeoCanBackend::open()
             continue;
         const QVariant param = configurationParameter(key);
         const bool success = d->setConfigurationParameter(key, param);
+#ifndef _WIN32  // @TODO - make it compile with MinGw
         if (Q_UNLIKELY(!success)) {
             qCWarning(QT_CANBUS_PLUGINS_ICSNEOCAN, "Cannot apply parameter %d with value %ls.",
                       key, qUtf16Printable(param.toString()));
         }
+#endif
     }
     setState(QCanBusDevice::ConnectedState);
     return true;
