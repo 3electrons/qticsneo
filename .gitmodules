@@ -1,3 +1,6 @@
 [submodule "https:/github.com/3electrons/libicsneo.git"]
 	path = https:/github.com/3electrons/libicsneo.git
 	url = ./libicsneo
+[submodule "libicsneo"]
+	path = libicsneo
+	url = https://github.com/3electrons/libicsneo

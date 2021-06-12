@@ -31,7 +31,7 @@ TARGET = qticsneocanbus
 TEMPLATE = lib
 CONFIG += plugin object_parallel_to_source
 
-#DESTDIR = plugins/canbus
+DESTDIR = plugins/canbus
 DISTFILES = icsneo.json
 INCLUDEPATH = libicsneo/include \
               generated
