@@ -107,7 +107,7 @@ win32-gcc{
 
 win32{
 
-    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN    # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
+    QMAKE_CXXFLAGS +=   -DWPCAP -DHAVE_REMOTE -DWIN32_LEAN_AND_MEAN  /Zc:strictStrings-  # to force including Win32-Extensions from pcap.h in third-party/winpcap/inlclude
     INCLUDEPATH    +=   libicsneo/third-party/optional-lite/include \
                         libicsneo/third-party/winpcap/include
 
