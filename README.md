@@ -38,14 +38,22 @@ The dependencies are as follows:
  - `libpcap0.8-dev`
  - `build-essential` is recommended
 
+## Changelog 
+### Release 2021.06.14 
+- Added channels listed as CANx.y where X is Interpids device and Y is Network/Channel number on device such as HSCAN1, HSCANFD2 
+- Added CANFD support 
+- Shadow buildng works 
+- Verification of bitrate is done by libicsneo - returning nice error messages 
+- Added License file
+
+### Release 2021.06.12 
+- Proof of concept - basic functionality. 
 
 ### Still TODO
-- Support for multiple channels (only one channel supported at the noment) 
-- Verbose logging 
-- ~~Shadow building~~
-- Verify channel distinguish when starting or multiplexing particular device and add channel support 
-- Verification of bitrate according to icsneo enum types
-- Remove incoming event handler as it is not needed 
-- Implement all configuration / parameters Keys with its proper support during opening device (Loopback, DataBitRate Key ) 
-- Verify if device status could be better implemnted
+- Verbose logging (No logging at all on Windows)
+- Consoder implementation of IncomingEvenHandler (mockup already exists) with setConfigurationParameter(QCanBusDevice::UserKey + PollingQueue ) to possibly process heavy loads. 
+- Not shure if QCanBusDevice::LoopbackKey is properly implemented - using CAN_SETTINGS->Mode = LOOPBACK. 
+- Verify if device status could be better implemnted - Possibly by events? 
 - Implement resetDevice (now it is mockup only) 
+- Consider adding AutoBaudKey as own Key to support CAN_SETTINGS::auto_baud. More info form libicsneo needed. 
+- Implement configuration parameters QCanBusDevice::RecieveOwnKey, QCanBusDevice::RawFilterKey, QCanBusDevice::ErrorFilterKey, 

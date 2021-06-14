@@ -1,28 +1,3 @@
-# Simplified build file for libicsneo
-#
-# This is canbus plugin for https://github.com/intrepidcs/libicsneo library for interpids CAN-BUS devices.
-# Whole libicsneo is "staticaly" complied into plugin. Using dynamic version of libicsneo was impractical and C++ interface is
-# not recommended for such use.
-# By libicsneo - github page: "It is also possible to use the precompiled binaries with runtime linking. It is not recommended or supported to
-# attempt to use the C++ interface with dynamic linking due to the complexities of C++ compilers."
-
-# Hence current form. As bouns MinGw is supported.
-# Dependencies:
-# - libusb-1.0
-# - libpcap
-# Optionally system wide libftdi1 can be used by using  BUILD_FLAGS:
-# system_ftdi - use systemwide ftdi library  Unix only
-# 3rd_ftdi  - use ftdi delivered by libiscneo
-
-# Compile:
-# qmake
-# make
-# move pluigins directory manualy to your app home directory or install it system wide.
-
-# Remarks:
-# Shadow building is not supported
-# generated directory - contains preconfigured files - to avoid cmake usage
-
 BUILD_FLAGS = 3rd_ftdi
 
 QT = core serialbus

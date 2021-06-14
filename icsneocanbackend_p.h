@@ -6,6 +6,7 @@
 #define ICSNEOCANBACKEND_P_H
 
 #include "icsneocanbackend.h"
+#include "icsneo/icsneocpp.h"
 #include <memory>
 
 #if defined(Q_OS_WIN32)
@@ -63,14 +64,12 @@ public:
 
     bool open();
     void close();
-    void eventHandler(QEvent *event);
     bool setConfigurationParameter(int key, const QVariant &value);
     bool setupChannel(const QString &interfaceName);
     void setupDefaultConfigurations();
     void enableWriteNotification(bool enable);
     void startWrite();
     void readAllReceivedMessages();
-    bool verifyBitRate(int bitrate);
 
     void resetController();
     QCanBusDevice::CanBusStatus busStatus();
@@ -80,21 +79,20 @@ public:
     void messageCallback(std::shared_ptr<icsneo::Message> m);
     QCanBusFrame interpretFrame( icsneo::CANMessage * msg );
 
+    /*--------------*/
     IcsNeoCanBackend * const q_ptr;
     QTimer *outgoingEventNotifier = nullptr;
     IncomingEventHandler *incomingEventHandler = nullptr;
-
 
     quint8 device = 255;
     quint8 channel = 255;
 
     std::shared_ptr<icsneo::Device> m_device;
-
     static QMap<QString, std::shared_ptr<icsneo::Device>> m_devices;
+    icsneo::Network::NetID m_netID = icsneo::Network::NetID::Invalid;
 
     int m_messageCallbackId = 0;
-    //static std::vector<std::shared_ptr<icsneo::Device>> m_devices;
-
+    bool m_hasFD = false;
 };
 
 QT_END_NAMESPACE

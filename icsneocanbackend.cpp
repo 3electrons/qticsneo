@@ -44,9 +44,7 @@ private:
 /*-----------------------------------------------------------------------------------------
                              B A C K E N D   P R I V A T E
 -----------------------------------------------------------------------------------------*/
-
-
-//std::vector<std::shared_ptr<icsneo::Device>>  IcsNeoCanBackendPrivate::m_devices;
+QMap<QString, std::shared_ptr<icsneo::Device>> IcsNeoCanBackendPrivate::m_devices;
 
 IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
     q_ptr(q),
@@ -61,31 +59,29 @@ bool IcsNeoCanBackendPrivate::open()
     if (!m_device.get()) // device does not exist anymore
         return false;
 
-    const int bitrate     = q->configurationParameter(QCanBusDevice::BitRateKey).toInt();
+    int bitrate      = q->configurationParameter(QCanBusDevice::BitRateKey).toInt();
+    int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
+    bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
 
     /*  @TODO - implement remainging keys
-    const bool receiveOwn = q->configurationParameter(QCanBusDevice::ReceiveOwnKey).toBool();
-    const bool loopback   = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
-
     RawFilterKey = 0,
     ErrorFilterKey,
-    LoopbackKey,
     ReceiveOwnKey,
-    CanFdKey,
-    DataBitRateKey,
-    ProtocolKey,
-    UserKey = 30
     */
 
     bool res =  m_device->open();
+    loopback ?  m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = LOOPBACK :
+            m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = NORMAL;
 
-    res &= m_device->settings->setBaudrateFor(icsneo::Network::NetID::HSCAN, bitrate);
+    res &= m_device->settings->setBaudrateFor(m_netID, bitrate);
+    if (m_hasFD)  res&= m_device->settings->setFDBaudrateFor(m_netID, canbitrate);
+
     res &= m_device->settings->apply();
     res &= m_device->goOnline();
 
     if (!res)
-         q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
-                     QCanBusDevice::ConnectionError);
+        q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
+                    QCanBusDevice::ConnectionError);
     else
     {
         m_messageCallbackId = m_device->addMessageCallback(icsneo::MessageCallback([=](std::shared_ptr<icsneo::Message> m)
@@ -95,7 +91,7 @@ bool IcsNeoCanBackendPrivate::open()
             QCanBusFrame frame = interpretFrame(msg.get());
             if (frame.isValid())
             {
-               newFrames.append(frame);
+                newFrames.append(frame);
                 q->enqueueReceivedFrames(newFrames);
             }
         } ));
@@ -112,46 +108,64 @@ void IcsNeoCanBackendPrivate::close()
     if (outgoingEventNotifier) {
         delete outgoingEventNotifier;
         outgoingEventNotifier = nullptr;
-   }
+    }
 
-   if (m_messageCallbackId)
-       m_device->removeMessageCallback(m_messageCallbackId);
+    if (m_messageCallbackId)
+        m_device->removeMessageCallback(m_messageCallbackId);
 
-   bool res = m_device->goOffline() && m_device->close();
+    bool res = m_device->goOffline() && m_device->close();
 
     if (!res)
         q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
                     QCanBusDevice::OperationError);
-
-}
-
-void IcsNeoCanBackendPrivate::eventHandler(QEvent *event)
-{
-    const int code = event->type() - QEvent::User;
-
-    if (code == 1)
-        readAllReceivedMessages();
 }
 
 bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant &value)
 {
     Q_Q(IcsNeoCanBackend);
-
-    switch (key) {
-    case QCanBusDevice::BitRateKey:
-        return verifyBitRate(value.toInt());
-    case QCanBusDevice::ReceiveOwnKey:
-        if (Q_UNLIKELY(q->state() != QCanBusDevice::UnconnectedState)) {
-            q->setError(IcsNeoCanBackend::tr("Cannot configure TxEcho for open device"),
+    switch (key)
+    {
+        case QCanBusDevice::BitRateKey:       return true;
+        case QCanBusDevice::DataBitRateKey:   return true;
+        case QCanBusDevice::CanFdKey:       {  m_hasFD = value.toBool();  return true; }
+        case QCanBusDevice::LoopbackKey:       return true;
+        case QCanBusDevice::ReceiveOwnKey:
+        {
+            if (Q_UNLIKELY(q->state() != QCanBusDevice::UnconnectedState))
+            {
+                q->setError(IcsNeoCanBackend::tr("Cannot configure TxEcho for open device"),
+                            QCanBusDevice::ConfigurationError);
+                return false;
+            }
+            return true;
+        }
+        default:
+        {
+            q->setError(IcsNeoCanBackend::tr("Unsupported configuration key: %1").arg(key),
                         QCanBusDevice::ConfigurationError);
             return false;
         }
-        return true;
-    default:
-        q->setError(IcsNeoCanBackend::tr("Unsupported configuration key: %1").arg(key),
-                    QCanBusDevice::ConfigurationError);
-        return false;
     }
+}
+
+icsneo::Network::NetID netID(quint8 channel)
+{
+    /**
+     Possibly can be done more generic - by list interfaces and counting them.
+     May be expensive but no worry as used only for initialization of m_netID member.
+    */
+
+    switch (channel)
+    {
+        case 0: return icsneo::Network::NetID::HSCAN;
+        case 1: return icsneo::Network::NetID::HSCAN2;
+        case 2: return icsneo::Network::NetID::HSCAN3;
+        case 3: return icsneo::Network::NetID::HSCAN4;
+        case 4: return icsneo::Network::NetID::HSCAN5;
+        case 5: return icsneo::Network::NetID::HSCAN6;
+        case 6: return icsneo::Network::NetID::HSCAN7;
+    }
+    return icsneo::Network::NetID::Invalid;
 }
 
 bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
@@ -161,15 +175,18 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
     const QRegularExpression re(QStringLiteral("can(\\d)\\.(\\d)"));
     const QRegularExpressionMatch match = re.match(interfaceName);
 
-    if (Q_LIKELY(match.hasMatch())) {
+    if (Q_LIKELY(match.hasMatch()))
+    {
         device = quint8(match.captured(1).toUShort());
         channel = quint8(match.captured(2).toUShort());
-    } else {
+        m_netID = netID(channel);
+    }
+    else
+    {
         q->setError(IcsNeoCanBackend::tr("Invalid interface '%1'.")
                     .arg(interfaceName), QCanBusDevice::ConnectionError);
         return false;
     }
-
     return true;
 }
 
@@ -177,14 +194,14 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
 {
     Q_Q(IcsNeoCanBackend);
     q->setConfigurationParameter(QCanBusDevice::BitRateKey, 500000);
-    q->setConfigurationParameter(QCanBusDevice::ReceiveOwnKey, false);
+    q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, 2000000);
     q->setConfigurationParameter(QCanBusDevice::CanFdKey, false);
+    q->setConfigurationParameter(QCanBusDevice::LoopbackKey, false);
 }
 
 void IcsNeoCanBackendPrivate::enableWriteNotification(bool enable)
 {
     Q_Q(IcsNeoCanBackend);
-
     if (outgoingEventNotifier) {
         if (enable) {
             if (!outgoingEventNotifier->isActive())
@@ -210,22 +227,24 @@ void IcsNeoCanBackendPrivate::startWrite()
     const QCanBusFrame frame = q->dequeueOutgoingFrame();
     const QByteArray payload = frame.payload();
 
-    auto msg = std::make_shared<icsneo::CANMessage>();
-    msg->network = icsneo::Network::NetID::HSCAN;
-    msg->data.insert(msg->data.end(), payload.begin(), payload.end()) ;
-    msg->arbid =frame.frameId();
-    msg->isRemote = frame.frameType() == QCanBusFrame::RemoteRequestFrame;
-    msg->isExtended = frame.hasExtendedFrameFormat();
-    msg->isCANFD =  q->configurationParameter(QCanBusDevice::CanFdKey).toBool();
-    msg->baudrateSwitch = frame.hasBitrateSwitch();
+    auto msg                 = std::make_shared<icsneo::CANMessage>();
+    msg->network             = m_netID;
+    msg->arbid               = frame.frameId();
+    msg->isRemote            = frame.frameType() == QCanBusFrame::RemoteRequestFrame;
+    msg->isCANFD             =  m_hasFD;
+    msg->baudrateSwitch      = frame.hasBitrateSwitch();
     msg->errorStateIndicator = frame.hasErrorStateIndicator();
 
-    // Attempt to transmit the sample msg
-     if(m_device->transmit(msg))
-       q->framesWritten(qint64(1));
-     else
-           q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
-                       QCanBusDevice::WriteError) ;
+    if (m_hasFD)
+        msg->isExtended = frame.hasExtendedFrameFormat();
+
+    msg->data.insert(msg->data.end(), payload.begin(), payload.end()) ;
+
+    if(m_device->transmit(msg))
+        q->framesWritten(qint64(1));
+    else
+        q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
+                    QCanBusDevice::WriteError) ;
 
     if (q->hasOutgoingFrames())
         enableWriteNotification(true);
@@ -233,16 +252,18 @@ void IcsNeoCanBackendPrivate::startWrite()
 
 void IcsNeoCanBackendPrivate::readAllReceivedMessages()
 {
+    //@TODO this is generic implementation based on Qt CanBus module will not work till polling is not enabled
+    // Attempt to get messages, limiting the number of messages at once to 50,000
+    // A third parameter of type std::chrono::milliseconds is also accepted if a timeout is desired
+
     Q_Q(IcsNeoCanBackend);
     QVector<QCanBusFrame> newFrames;
     std::vector<std::shared_ptr<icsneo::Message>> msgs;
-    // Attempt to get messages, limiting the number of messages at once to 50,000
-    // A third parameter of type std::chrono::milliseconds is also accepted if a timeout is desired
     if(!m_device->getMessages(msgs, 50000, std::chrono::milliseconds(500)))
     {
-       q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
-                   QCanBusDevice::ReadError) ;
-                   return;
+        q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
+                    QCanBusDevice::ReadError) ;
+        return;
     }
 
     for (auto m: msgs)
@@ -250,39 +271,22 @@ void IcsNeoCanBackendPrivate::readAllReceivedMessages()
         auto msg = std::static_pointer_cast<icsneo::CANMessage>(m);
         QCanBusFrame frame = interpretFrame(msg.get());
         if (frame.isValid())
-          newFrames.append(std::move(frame));
+            newFrames.append(std::move(frame));
     }
     q->enqueueReceivedFrames(newFrames);
-}
-
-bool IcsNeoCanBackendPrivate::verifyBitRate(int bitrate)
-{
-    Q_Q(IcsNeoCanBackend);
-
-    if (Q_UNLIKELY(q->state() != QCanBusDevice::UnconnectedState)) {
-        q->setError(IcsNeoCanBackend::tr("Cannot configure bitrate for open device"),
-                    QCanBusDevice::ConfigurationError);
-        return false;
-    }
-    /*
-    if (Q_UNLIKELY(bitrateCodeFromBitrate(bitrate) == 0)) {
-        q->setError(IcsNeoCanBackend::tr("Unsupported bitrate %1.").arg(bitrate),
-                    QCanBusDevice::ConfigurationError);
-        return false;
-    }
-    */
-    return true;
 }
 
 void IcsNeoCanBackendPrivate::resetController()
 {
     //@TODO: Implement me
+    // Possibly reinit m_devices then find device by S/N and model and reinit m_device and wholde device status co current state.
     qDebug("IcsNeoCanBackendPrivate::resetController() - non implemented");
 }
 
 QCanBusFrame IcsNeoCanBackendPrivate::interpretFrame( icsneo::CANMessage * msg )
 {
-    if (icsneo::Network::Type::CAN != msg->network.getType())
+    if (!(icsneo::Network::Type::CAN == msg->network.getType() &&
+          msg->network.getNetID() == m_netID ) )
         return QCanBusFrame(QCanBusFrame::InvalidFrame);
 
     QByteArray data;
@@ -293,15 +297,17 @@ QCanBusFrame IcsNeoCanBackendPrivate::interpretFrame( icsneo::CANMessage * msg )
 
     frame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(msg->timestamp));
     frame.setExtendedFrameFormat(msg->isExtended);
-    //@TODO - how to set get info about localecho ?
-    //frame.setLocalEcho(msg->transmited);
+    frame.setFlexibleDataRateFormat(msg->isCANFD);
     frame.setErrorStateIndicator(msg->errorStateIndicator);
+
+    //frame.setLocalEcho(msg->transmited); What does it do?
+
     if (msg->error)
         frame.setFrameType(QCanBusFrame::ErrorFrame);
     else if (msg->isRemote)
-         frame.setFrameType(QCanBusFrame::RemoteRequestFrame);
+        frame.setFrameType(QCanBusFrame::RemoteRequestFrame);
     else
-         frame.setFrameType(QCanBusFrame::DataFrame);
+        frame.setFrameType(QCanBusFrame::DataFrame);
     return frame;
 }
 
@@ -310,7 +316,7 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
     Q_Q(IcsNeoCanBackend);
 
     if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::EventWarning )
-         return QCanBusDevice::CanBusStatus::Warning;
+        return QCanBusDevice::CanBusStatus::Warning;
 
     if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::Error )
     {
@@ -319,37 +325,31 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
     }
 
     if (m_device->isOnline())
-       return QCanBusDevice::CanBusStatus::Good;
+        return QCanBusDevice::CanBusStatus::Good;
     else
         return QCanBusDevice::CanBusStatus::BusOff;
 
     return QCanBusDevice::CanBusStatus::Unknown;
 }
 
-
-
-QMap<QString, std::shared_ptr<icsneo::Device>> IcsNeoCanBackendPrivate::m_devices;
-
 void IcsNeoCanBackendPrivate::interfaces( QList<QCanBusDeviceInfo> & list)
 {
-    std::vector<std::shared_ptr<icsneo::Device>>  devices = icsneo::FindAllDevices();
-    int channel = 0;
     m_devices.clear();
-
-    for (int i = 0 ; i < devices.size() ; i++)
+    std::vector<std::shared_ptr<icsneo::Device>>  devices = icsneo::FindAllDevices();
+    for (unsigned int i = 0 ; i < devices.size() ; i++)
     {
-      // for QCanBusDeviceInfo
-      std::shared_ptr<icsneo::Device> & device = devices[i];
-      QString description =   QString::fromStdString(device->describe());
-      QString serial      = QString::fromStdString(device->getSerial());
-
-      QCanBusDeviceInfo info = IcsNeoCanBackend::createDeviceInfo(serial, description, i, channel);
-      m_devices[info.name()] = device;
-      list.append(std::move(info));
-      device.reset();
+        std::shared_ptr<icsneo::Device> & device = devices[i];
+        int channels = device->getNetworkCountByType(icsneo::Network::Type::CAN);
+        for (int channel = 0 ; channel < channels ; channel++)
+        {
+            QString description =   QString::fromStdString(device->describe());
+            QString serial      = QString::fromStdString(device->getSerial());
+            QCanBusDeviceInfo info = IcsNeoCanBackend::createDeviceInfo(serial, description, i, channel);
+            m_devices[info.name()] = device;
+            list.append(std::move(info));
+        }
     }
 }
-
 
 /*-----------------------------------------------------------------------------------------
                                         B A C K E N D
@@ -366,7 +366,6 @@ IcsNeoCanBackend::IcsNeoCanBackend(const QString &name, QObject *parent) :
     setResetControllerFunction(f);
     std::function<CanBusStatus()> g = std::bind(&IcsNeoCanBackend::busStatus, this);
     setCanBusStatusGetter(g);
-    QList<QCanBusDeviceInfo> list;
     d_ptr->m_device = IcsNeoCanBackendPrivate::m_devices[name];
 }
 
@@ -390,15 +389,29 @@ QCanBusDeviceInfo IcsNeoCanBackend::createDeviceInfo(const QString &serialNumber
 
 QList<QCanBusDeviceInfo> IcsNeoCanBackend::interfaces()
 {
-   QList<QCanBusDeviceInfo> list;
-   IcsNeoCanBackendPrivate::interfaces(list);
-   return list;
+    QList<QCanBusDeviceInfo> list;
+    IcsNeoCanBackendPrivate::interfaces(list);
+    return list;
 }
 
 QString IcsNeoCanBackend::interpretErrorFrame(const QCanBusFrame &errorFrame)
 {
-    // TODO: Implement me
-    Q_UNUSED(errorFrame);
+    //@TODO - this is stupid ... and not usable as error frame is not set anywhere
+    switch (errorFrame.error())
+    {
+    case QCanBusFrame::TransmissionTimeoutError   : return "Transmission timeout";
+    case QCanBusFrame::LostArbitrationError       : return "Lost arbitration";
+    case QCanBusFrame::ControllerError            : return "Controller error";
+    case QCanBusFrame::ProtocolViolationError     : return "Protocol violation";
+    case QCanBusFrame::TransceiverError           : return "Trensceiver error";
+    case QCanBusFrame::MissingAcknowledgmentError : return "Missing Acknowledgment";
+    case QCanBusFrame::BusOffError                : return "Bus off";
+    case QCanBusFrame::BusError                   : return "Bus error";
+    case QCanBusFrame::ControllerRestartError     : return "Controller restart fail";
+    case QCanBusFrame::UnknownError               : return "Unknown error";
+    case QCanBusFrame::AnyError                   : return "AnyError";
+    }
+
     return QString();
 }
 
@@ -461,12 +474,6 @@ bool IcsNeoCanBackend::writeFrame(const QCanBusFrame &newData)
         return false;
     }
 
-    // CAN FD frame format is not supported by the hardware yet
-    if (Q_UNLIKELY(newData.hasFlexibleDataRateFormat())) {
-        setError(tr("CAN FD frame format not supported"), QCanBusDevice::WriteError);
-        return false;
-    }
-
     enqueueOutgoingFrame(newData);
     d->enableWriteNotification(true);
     return true;
@@ -481,7 +488,6 @@ void IcsNeoCanBackend::resetController()
 QCanBusDevice::CanBusStatus IcsNeoCanBackend::busStatus()
 {
     Q_D(IcsNeoCanBackend);
-
     return d->busStatus();
 }
 
