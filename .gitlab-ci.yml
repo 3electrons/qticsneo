@@ -20,10 +20,12 @@ stages:
        
 
 build_qt5.15.2_MinGw_32:
+    COMPILER: "MinGw32"
     <<: *windows_build 
     tags: ["mingw_qt5.15.2"]
 
 build_qt5.14.2_MSVC: 
+    COMPILER: "MSVC 2017 64Bit"
     <<: *windows_build 
     tags: ["msvc2017_64_qt5.14.2"]
 
