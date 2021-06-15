@@ -38,6 +38,10 @@ The dependencies are as follows:
  - `libpcap0.8-dev`
  - `build-essential` is recommended
 
+
+## Recognized issues
+- Bitrate settings under windows sets it to 20000 - reagardles of value. Do not know why - at the moment.
+
 ## Changelog 
 ### Release 2021.06.15 
 - Added channels listed as CANx.y where X is Interpids device and Y is Network/Channel number on device such as HSCAN1, HSCANFD2 
@@ -56,7 +60,7 @@ The dependencies are as follows:
 
 ### Still TODO
 - Verbose logging (No logging at all on Windows)
-- Consoder implementation of IncomingEvenHandler (mockup already exists) with setConfigurationParameter(QCanBusDevice::UserKey + PollingQueue ) to possibly process heavy loads. 
+- Consider implementation of IncomingEvenHandler (mockup already exists) with setConfigurationParameter(QCanBusDevice::UserKey + PollingQueue ) to possibly process heavy loads. 
 - Verify if device status could be better implemnted - Possibly by events? 
 - Consider adding AutoBaudKey as own Key to support CAN_SETTINGS::auto_baud. More info form libicsneo needed. 
 - Implement configuration parameters QCanBusDevice::RecieveOwnKey, QCanBusDevice::RawFilterKey, QCanBusDevice::ErrorFilterKey, 

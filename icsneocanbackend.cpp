@@ -76,8 +76,12 @@ bool IcsNeoCanBackendPrivate::open()
     if (res)            res &= m_device->goOnline();
 
     if (!res)
+    {
+        m_device->close();
         q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
                     QCanBusDevice::ConnectionError);
+
+    }
     else
     {
         m_messageCallbackId = m_device->addMessageCallback(icsneo::MessageCallback([=](std::shared_ptr<icsneo::Message> m)
