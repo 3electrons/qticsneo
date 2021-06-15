@@ -52,6 +52,8 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 {
 }
 
+
+
 bool IcsNeoCanBackendPrivate::open()
 {
     Q_Q(IcsNeoCanBackend);
@@ -63,16 +65,15 @@ bool IcsNeoCanBackendPrivate::open()
     int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
     bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
 
+
+
     bool res =  m_device->open();
-
     loopback ?  m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = LOOPBACK :
-            m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = NORMAL;
+                m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = NORMAL;
 
-    res &= m_device->settings->setBaudrateFor(m_netID, bitrate);
-    if (m_hasFD)  res&= m_device->settings->setFDBaudrateFor(m_netID, canbitrate);
-
-    res &= m_device->settings->apply();
-    res &= m_device->goOnline();
+    if (res)            res &= m_device->settings->setBaudrateFor(m_netID, bitrate)      && m_device->settings->apply();
+    if (res && m_hasFD) res &= m_device->settings->setFDBaudrateFor(m_netID, canbitrate) && m_device->settings->apply();
+    if (res)            res &= m_device->goOnline();
 
     if (!res)
         q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
