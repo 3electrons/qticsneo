@@ -79,7 +79,7 @@ unix{
 win32-gcc{
     QMAKE_CXXFLAGS += -std=c++17 -Wno-sign-compare -Wno-unused-parameter -Wno-switch -Wno-missing-field-initializers -Wimplicit-fallthrough=0  #to get rid of annnoying icsneo warrnings
     QMAKE_CFLAGS = $$QMAKE_CXXFLAGS
-    CONFIG+= object_parallel_to_source
+    CONFIG+= object_parallel_to_source # to separate multiple ftdi.o files 
 }
 
 win32-msvc*{
