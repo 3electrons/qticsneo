@@ -39,7 +39,7 @@ The dependencies are as follows:
  - `build-essential` is recommended
 
 ## Changelog 
-### Release 2021.06.14 
+### Release 2021.06.15 
 - Added channels listed as CANx.y where X is Interpids device and Y is Network/Channel number on device such as HSCAN1, HSCANFD2 
 - Added CANFD support 
 - Shadow buildng works 
@@ -49,11 +49,14 @@ The dependencies are as follows:
 ### Release 2021.06.12 
 - Proof of concept - basic functionality. 
 
+
+## Considerations how to properly implement some features 
+- Not shure if QCanBusDevice::LoopbackKey is properly implemented - using CAN_SETTINGS->Mode = LOOPBACK. Possibly should be done cor CANFD_SETTINGS as well. 
+- Implemented resetDevice as closing underlying Device and recreating based on SerialNumber - might not work stable with multichannel approach. Rahter need additional attention for implementing it better. 
+
 ### Still TODO
 - Verbose logging (No logging at all on Windows)
 - Consoder implementation of IncomingEvenHandler (mockup already exists) with setConfigurationParameter(QCanBusDevice::UserKey + PollingQueue ) to possibly process heavy loads. 
-- Not shure if QCanBusDevice::LoopbackKey is properly implemented - using CAN_SETTINGS->Mode = LOOPBACK. 
 - Verify if device status could be better implemnted - Possibly by events? 
-- Implement resetDevice (now it is mockup only) 
 - Consider adding AutoBaudKey as own Key to support CAN_SETTINGS::auto_baud. More info form libicsneo needed. 
 - Implement configuration parameters QCanBusDevice::RecieveOwnKey, QCanBusDevice::RawFilterKey, QCanBusDevice::ErrorFilterKey, 

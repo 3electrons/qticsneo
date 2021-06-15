@@ -63,13 +63,8 @@ bool IcsNeoCanBackendPrivate::open()
     int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
     bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
 
-    /*  @TODO - implement remainging keys
-    RawFilterKey = 0,
-    ErrorFilterKey,
-    ReceiveOwnKey,
-    */
-
     bool res =  m_device->open();
+
     loopback ?  m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = LOOPBACK :
             m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = NORMAL;
 
@@ -231,13 +226,10 @@ void IcsNeoCanBackendPrivate::startWrite()
     msg->network             = m_netID;
     msg->arbid               = frame.frameId();
     msg->isRemote            = frame.frameType() == QCanBusFrame::RemoteRequestFrame;
-    msg->isCANFD             =  m_hasFD;
+    msg->isCANFD             = m_hasFD;
+    msg->isExtended          = frame.hasExtendedFrameFormat();
     msg->baudrateSwitch      = frame.hasBitrateSwitch();
     msg->errorStateIndicator = frame.hasErrorStateIndicator();
-
-    if (m_hasFD)
-        msg->isExtended = frame.hasExtendedFrameFormat();
-
     msg->data.insert(msg->data.end(), payload.begin(), payload.end()) ;
 
     if(m_device->transmit(msg))
@@ -281,6 +273,39 @@ void IcsNeoCanBackendPrivate::resetController()
     //@TODO: Implement me
     // Possibly reinit m_devices then find device by S/N and model and reinit m_device and wholde device status co current state.
     qDebug("IcsNeoCanBackendPrivate::resetController() - non implemented");
+
+
+    Q_Q(IcsNeoCanBackend);
+
+    QString description = QString::fromStdString(m_device->describe());
+    QString serial      = QString::fromStdString(m_device->getSerial());
+
+
+    this->close();              // Close current connection
+    delete m_device.get();      // Delete current device
+    m_device.reset();           // Reset variable
+
+    // Restore device handler
+    std::vector<std::shared_ptr<icsneo::Device>>  devices = icsneo::FindAllDevices();
+    for (auto dev : devices)
+    {
+        QString dev_description =   QString::fromStdString(dev->describe());
+        QString dev_serial      = QString::fromStdString(dev->getSerial());
+
+       if (dev_description == description && dev_serial == serial)
+       {
+           m_device = dev ;
+           dev.reset();
+           break;
+       }
+    }
+
+    // Resored opened state;
+    if (q->state() == QCanBusDevice::ConnectedState)
+    {
+       q->setState(QCanBusDevice::UnconnectedState);
+       q->open();
+    }
 }
 
 QCanBusFrame IcsNeoCanBackendPrivate::interpretFrame( icsneo::CANMessage * msg )
@@ -466,14 +491,12 @@ bool IcsNeoCanBackend::writeFrame(const QCanBusFrame &newData)
         setError(tr("Cannot write invalid QCanBusFrame"), QCanBusDevice::WriteError);
         return false;
     }
-
     const QCanBusFrame::FrameType type = newData.frameType();
     if (Q_UNLIKELY(type != QCanBusFrame::DataFrame && type != QCanBusFrame::RemoteRequestFrame)) {
         setError(tr("Unable to write a frame with unacceptable type"),
                  QCanBusDevice::WriteError);
         return false;
     }
-
     enqueueOutgoingFrame(newData);
     d->enableWriteNotification(true);
     return true;
