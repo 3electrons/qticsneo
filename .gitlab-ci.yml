@@ -13,17 +13,17 @@ stages:
         - jom -j24        
 
     artifacts:
-        name: "qticsneocanbus_dll_Qt%QT_VER%_Rev%REVISION%_Build%CI_PIPELINE_ID%"
+        name: "qticsneocanbus_dll_%CI_RUNNER_TAGS%_Build%CI_PIPELINE_ID%"
         paths:
         - plugins/canbus/*.dll 
         expire_in: 2 days 
        
 
-build_qt5.15.2_MinGw_32:
+build_qt5.15.2_MinGw_32:    
     <<: *windows_build 
     tags: ["mingw_qt5.15.2"]
 
-build_qt5.14.2_MSVC: 
+build_qt5.14.2_MSVC:     
     <<: *windows_build 
     tags: ["msvc2017_64_qt5.14.2"]
 
