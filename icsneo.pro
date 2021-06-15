@@ -11,6 +11,7 @@ DESTDIR = plugins/canbus
 DISTFILES = icsneo.json
 
 INCLUDEPATH = libicsneo/include \
+              generated/ \
               .
 
 MOC_DIR = objects
@@ -53,8 +54,8 @@ unix{
 
      ICSNEO_SOURCES +=   libicsneo/platform/posix/ftdi.cpp \
                          libicsneo/platform/posix/pcap.cpp \
-                         libicsneo/platform/posix/stm32.cpp \
-                         libicsneo/platform/posix/linux/stm32linux.cpp
+                         libicsneo/platform/posix/cdcacm.cpp \
+                         libicsneo/platform/posix/linux/cdcacmlinux.cpp
 
 
     contains(BUILD_FLAGS, 3rd_ftdi){
