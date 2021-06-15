@@ -82,7 +82,7 @@ win32-gcc{
 }
 
 win32-msvc*{
-   QMAKE_CXXFLAGS+=  /Zc:strictStrings-  #thid-party/wincap/pcap.cpp generated C2664 error
+   QMAKE_CXXFLAGS+=  /Zc:strictStrings-  /std:c++17 #thid-party/wincap/pcap.cpp generated C2664 error
 }
 
 win32{
