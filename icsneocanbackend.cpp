@@ -270,16 +270,9 @@ void IcsNeoCanBackendPrivate::readAllReceivedMessages()
 
 void IcsNeoCanBackendPrivate::resetController()
 {
-    //@TODO: Implement me
-    // Possibly reinit m_devices then find device by S/N and model and reinit m_device and wholde device status co current state.
-    qDebug("IcsNeoCanBackendPrivate::resetController() - non implemented");
-
-
     Q_Q(IcsNeoCanBackend);
-
     QString description = QString::fromStdString(m_device->describe());
     QString serial      = QString::fromStdString(m_device->getSerial());
-
 
     this->close();              // Close current connection
     delete m_device.get();      // Delete current device
