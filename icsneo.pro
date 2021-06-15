@@ -11,7 +11,7 @@ DESTDIR = plugins/canbus
 DISTFILES = icsneo.json
 
 INCLUDEPATH = libicsneo/include \
-              generated
+              .
 
 MOC_DIR = objects
 OBJECTS_DIR = objects
@@ -24,6 +24,7 @@ ICSNEO_SOURCES +=   libicsneo/api/icsneocpp/event.cpp \
                     libicsneo/communication/packet/ethernetpacket.cpp \
                     libicsneo/communication/packet/flexraypacket.cpp \
                     libicsneo/communication/packet/iso9141packet.cpp \
+                    libicsneo/communication/packet/versionpacket.cpp \
                     libicsneo/communication/decoder.cpp \
                     libicsneo/communication/encoder.cpp \
                     libicsneo/communication/ethernetpacketizer.cpp \
@@ -81,7 +82,7 @@ win32-gcc{
 }
 
 win32-msvc*{
-   QMAKE_CXXFLAGS+=  /Zc:strictStrings-   #thid-party/wincap/pcap.cpp generated C2664 error
+   QMAKE_CXXFLAGS+=  /Zc:strictStrings-  #thid-party/wincap/pcap.cpp generated C2664 error
 }
 
 win32{
