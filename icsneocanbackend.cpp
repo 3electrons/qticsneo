@@ -19,6 +19,9 @@
 QT_BEGIN_NAMESPACE
 Q_DECLARE_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_ICSNEOCAN)
 
+#define ParameterOmitKey  (QCanBusDevice::UserKey + 1)    // Omit process of configuration of device
+#define ParameterIsoFDKey  (QCanBusDevice::UserKey + 2)   // Set CANFD in ISO mode
+
 class OutgoingEventNotifier : public QTimer
 {
 public:
@@ -57,7 +60,7 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 bool IcsNeoCanBackendPrivate::setupDevice()
 {
     Q_Q(IcsNeoCanBackend);
-    bool omitConfig = q->configurationParameter(QCanBusDevice::UserKey+1).toBool();
+    bool omitConfig = q->configurationParameter(ParameterOmitKey).toBool();
 
     if (omitConfig)
         return true;
@@ -73,8 +76,14 @@ bool IcsNeoCanBackendPrivate::setupDevice()
     if (res)            res &= m_device->settings->setBaudrateFor(m_network.getNetID(), bitrate)      && m_device->settings->apply();
     if (res)
     {
-        if (m_hasFD)    res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), canbitrate) ;
-            else               m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
+        if (m_hasFD)   {
+                          res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), canbitrate) ;
+                           /*  NO_CANFD = 0 , CANFD_ENABLED=1, CANFD_BRS_ENABLED=2, CANFD_ENABLED_ISO=3, CANFD_BRS_ENABLED_ISO=4 */
+                           CANFD_SETTINGS * canFD = m_device->settings->getMutableCANFDSettingsFor(m_network);
+                           q->configurationParameter(ParameterIsoFDKey).toBool() ?
+                              canFD->FDMode = CANFD_BRS_ENABLED_ISO : canFD->FDMode = CANFD_BRS_ENABLED;
+                        }
+            else        m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
 
         res &=m_device->settings->apply();
     }
@@ -155,7 +164,8 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
             }
             return true;
         }
-        case QCanBusDevice::UserKey+1 :       return true;  // Omit Config parameter
+        case ParameterOmitKey :       return true;  // Omit Config parameter
+        case ParameterIsoFDKey :       return true;  // Omit Config parameter
         default:
         {
             q->setError(IcsNeoCanBackend::tr("Unsupported configuration key: %1").arg(key),
@@ -213,19 +223,25 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
     bool open = m_device->open();
     int bitrate = m_device->settings->getBaudrateFor(m_network);
     int fdbitrate = m_device->settings->getFDBaudrateFor(m_network);
-    bool hasCanFD = false, hasloopback = false;
+    bool hasCanFD = false, hasloopback = false , hasIso = false;
     const CANFD_SETTINGS * canFD = m_device->settings->getCANFDSettingsFor(m_network);
     const CAN_SETTINGS * can = m_device->settings->getCANSettingsFor(m_network);
 
     if (can && canFD)
     {
      hasCanFD = canFD->FDMode!= NO_CANFD;
+     hasIso = CANFD_BRS_ENABLED_ISO == canFD->FDMode;
      hasloopback = can->Mode & LOOPBACK;
      reportSettings(can,canFD);
+     q->setConfigurationParameter(ParameterOmitKey, false);
     }
+    else
+     q->setConfigurationParameter(ParameterOmitKey, true); // no data try to use default settings
+
     m_device->close();
 
-    q->setConfigurationParameter(QCanBusDevice::UserKey+1, bitrate< 0);     //Omit configuration if not able to determine current config
+    //Omit configuration if not able to determine current config
+    q->setConfigurationParameter(ParameterIsoFDKey, hasIso);     //Omit configuration if not able to determine current config
     q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate);       // standard BitRate
     q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
     q->setConfigurationParameter(QCanBusDevice::CanFdKey, hasCanFD);
@@ -381,7 +397,7 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
     for( auto & event : GetEvents(icsneo::EventFilter()) )
        warnings <<  QString::fromStdString(event.describe());
 
-    if (q->configurationParameter(QCanBusDevice::UserKey+1).toBool())
+    if (q->configurationParameter(ParameterOmitKey).toBool())
        warnings << "Configuration ommited - using device defaults";
 
     if (!warnings.isEmpty())
