@@ -4,6 +4,12 @@
 #include <QCanBusFactoryV2>
 #include "icsneocanbackend.h"
 
+#include <QtCore/qloggingcategory.h>
+
+QT_BEGIN_NAMESPACE
+
+Q_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_ICSNEOCAN, "qt.canbus.plugins.icsneo")
+
 class IcsNeoCanBusPlugin : public QObject, public QCanBusFactoryV2
 {
     Q_OBJECT
@@ -26,5 +32,7 @@ public:
 
 
 };
+
+QT_END_NAMESPACE
 
 #endif // ICSNEOPLUGIN_G

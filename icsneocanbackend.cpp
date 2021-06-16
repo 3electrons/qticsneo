@@ -53,6 +53,7 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 }
 
 
+
 bool IcsNeoCanBackendPrivate::setupDevice()
 {
     Q_Q(IcsNeoCanBackend);
@@ -222,8 +223,8 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
      hasloopback = can->Mode & LOOPBACK;
      reportSettings(can,canFD);
     }
-
     m_device->close();
+
     q->setConfigurationParameter(QCanBusDevice::UserKey+1, bitrate< 0);     //Omit configuration if not able to determine current config
     q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate);       // standard BitRate
     q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
@@ -370,23 +371,26 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
 {
     Q_Q(IcsNeoCanBackend);
 
-    bool omitConfig = q->configurationParameter(QCanBusDevice::UserKey+1).toBool();
-    if (omitConfig)
-    {
-        q->setError("Configuration ommited - using device defaults",QCanBusDevice::ConfigurationError);
-        return QCanBusDevice::CanBusStatus::Warning;
-    }
-
-    if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::EventWarning )
-    {
-        q->setError(QString::fromStdString(icsneo::GetLastError().describe()), QCanBusDevice::ConfigurationError);
-        return QCanBusDevice::CanBusStatus::Warning;
-    }
-
     if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::Error )
     {
         q->setError(QString::fromStdString(icsneo::GetLastError().describe()), QCanBusDevice::ConfigurationError);
         return QCanBusDevice::CanBusStatus::Error;
+    }
+
+    QStringList  warnings;
+    for( auto & event : GetEvents(icsneo::EventFilter()) )
+       warnings <<  QString::fromStdString(event.describe());
+
+    if (q->configurationParameter(QCanBusDevice::UserKey+1).toBool())
+       warnings << "Configuration ommited - using device defaults";
+
+    if (!warnings.isEmpty())
+    {
+        for(auto msg: warnings)
+            qCWarning(QT_CANBUS_PLUGINS_ICSNEOCAN, "Warning: %ls", qUtf16Printable(msg));
+
+        q->setError(warnings.join("\n"), QCanBusDevice::ConfigurationError);
+        return QCanBusDevice::CanBusStatus::Warning;
     }
 
     if (m_device->isOnline())
@@ -497,12 +501,12 @@ bool IcsNeoCanBackend::open()
             continue;
         const QVariant param = configurationParameter(key);
         const bool success = d->setConfigurationParameter(key, param);
-#ifndef _WIN32  // @TODO - make it compile with MinGw
+
         if (Q_UNLIKELY(!success)) {
             qCWarning(QT_CANBUS_PLUGINS_ICSNEOCAN, "Cannot apply parameter %d with value %ls.",
                       key, qUtf16Printable(param.toString()));
         }
-#endif
+
     }
     setState(QCanBusDevice::ConnectedState);
     return true;
