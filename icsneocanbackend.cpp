@@ -224,12 +224,8 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
     }
 
     m_device->close();
-
-
-    if (bitrate < 0)
-        q->setConfigurationParameter(QCanBusDevice::UserKey+1, true); //Omit configuration ...
-
-    q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate); // standard BitRate
+    q->setConfigurationParameter(QCanBusDevice::UserKey+1, bitrate< 0);     //Omit configuration if not able to determine current config
+    q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate);       // standard BitRate
     q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
     q->setConfigurationParameter(QCanBusDevice::CanFdKey, hasCanFD);
     q->setConfigurationParameter(QCanBusDevice::LoopbackKey, hasloopback);
