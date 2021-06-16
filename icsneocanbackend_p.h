@@ -62,6 +62,7 @@ class IcsNeoCanBackendPrivate
 public:
     IcsNeoCanBackendPrivate(IcsNeoCanBackend *q);
 
+    bool setupDevice();
     bool open();
     void close();
     bool setConfigurationParameter(int key, const QVariant &value);
@@ -89,10 +90,11 @@ public:
 
     std::shared_ptr<icsneo::Device> m_device;
     static QMap<QString, std::shared_ptr<icsneo::Device>> m_devices;
-    icsneo::Network::NetID m_netID = icsneo::Network::NetID::Invalid;
+    icsneo::Network m_network; //  = icsneo::Network::NetID::Invalid;
 
     int m_messageCallbackId = 0;
     bool m_hasFD = false;
+    bool m_omitSetting = false;
 };
 
 QT_END_NAMESPACE

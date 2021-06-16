@@ -53,6 +53,32 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 }
 
 
+bool IcsNeoCanBackendPrivate::setupDevice()
+{
+    Q_Q(IcsNeoCanBackend);
+    bool omitConfig = q->configurationParameter(QCanBusDevice::UserKey+1).toBool();
+
+    if (omitConfig)
+        return true;
+
+    bool res = true;
+    int bitrate      = q->configurationParameter(QCanBusDevice::BitRateKey).toInt();
+    int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
+    bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
+
+    loopback ?  m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = LOOPBACK :
+                m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = NORMAL;
+
+    if (res)            res &= m_device->settings->setBaudrateFor(m_network.getNetID(), bitrate)      && m_device->settings->apply();
+    if (res)
+    {
+        if (m_hasFD)    res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), canbitrate) ;
+            else               m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
+
+        res &=m_device->settings->apply();
+    }
+    return res;
+}
 
 bool IcsNeoCanBackendPrivate::open()
 {
@@ -61,26 +87,15 @@ bool IcsNeoCanBackendPrivate::open()
     if (!m_device.get()) // device does not exist anymore
         return false;
 
-    int bitrate      = q->configurationParameter(QCanBusDevice::BitRateKey).toInt();
-    int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
-    bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
-
-
-
     bool res =  m_device->open();
-    loopback ?  m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = LOOPBACK :
-                m_device->settings->getMutableCANSettingsFor(m_netID)->Mode = NORMAL;
-
-    if (res)            res &= m_device->settings->setBaudrateFor(m_netID, bitrate)      && m_device->settings->apply();
-    if (res && m_hasFD) res &= m_device->settings->setFDBaudrateFor(m_netID, canbitrate) && m_device->settings->apply();
-    if (res)            res &= m_device->goOnline();
+    if (res) res &= setupDevice();
+    if (res) res &= m_device->goOnline();
 
     if (!res)
     {
         m_device->close();
         q->setError(QString::fromStdString(icsneo::GetLastError().describe()),
                     QCanBusDevice::ConnectionError);
-
     }
     else
     {
@@ -127,7 +142,7 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
     {
         case QCanBusDevice::BitRateKey:       return true;
         case QCanBusDevice::DataBitRateKey:   return true;
-        case QCanBusDevice::CanFdKey:       {  m_hasFD = value.toBool();  return true; }
+        case QCanBusDevice::CanFdKey:        {  m_hasFD = value.toBool();  return true; }
         case QCanBusDevice::LoopbackKey:       return true;
         case QCanBusDevice::ReceiveOwnKey:
         {
@@ -139,6 +154,7 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
             }
             return true;
         }
+        case QCanBusDevice::UserKey+1 :       return true;  // Omit Config parameter
         default:
         {
             q->setError(IcsNeoCanBackend::tr("Unsupported configuration key: %1").arg(key),
@@ -146,26 +162,6 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
             return false;
         }
     }
-}
-
-icsneo::Network::NetID netID(quint8 channel)
-{
-    /**
-     Possibly can be done more generic - by list interfaces and counting them.
-     May be expensive but no worry as used only for initialization of m_netID member.
-    */
-
-    switch (channel)
-    {
-        case 0: return icsneo::Network::NetID::HSCAN;
-        case 1: return icsneo::Network::NetID::HSCAN2;
-        case 2: return icsneo::Network::NetID::HSCAN3;
-        case 3: return icsneo::Network::NetID::HSCAN4;
-        case 4: return icsneo::Network::NetID::HSCAN5;
-        case 5: return icsneo::Network::NetID::HSCAN6;
-        case 6: return icsneo::Network::NetID::HSCAN7;
-    }
-    return icsneo::Network::NetID::Invalid;
 }
 
 bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
@@ -178,8 +174,8 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
     if (Q_LIKELY(match.hasMatch()))
     {
         device = quint8(match.captured(1).toUShort());
-        channel = quint8(match.captured(2).toUShort());
-        m_netID = netID(channel);
+        channel = quint8(match.captured(2).toUShort());     
+        m_network = m_device->getNetworkByNumber(icsneo::Network::Type::CAN, channel+1);
     }
     else
     {
@@ -190,13 +186,53 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
     return true;
 }
 
+void reportSettings(const CAN_SETTINGS * can, const CANFD_SETTINGS * canFD)
+{
+  qDebug() << "----- CAN SETTINGS -----" ;
+  qDebug() << "Mode:" << can->Mode;
+  qDebug() << "BaudRate:" << can->Baudrate;
+  qDebug() << "SetBaudRate:" << can->SetBaudrate;
+  qDebug() << "BRP:" << can->BRP;
+  qDebug() << "auto_baud:" << can->auto_baud;
+
+  // msg->baudrateSwitch = data->header.BRS;
+
+  qDebug() << "----- CANFD SETTINGS -----" ;
+  qDebug() << "FDMode:" << canFD->FDMode;
+  qDebug() << "FDBaudRate:" << canFD->FDBaudrate;
+  qDebug() << "FDBRP:" << canFD->FDBRP;
+  qDebug() << "FDTDC:" << canFD->FDTDC;
+
+}
+
 void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
 {
     Q_Q(IcsNeoCanBackend);
-    q->setConfigurationParameter(QCanBusDevice::BitRateKey, 500000);
-    q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, 2000000);
-    q->setConfigurationParameter(QCanBusDevice::CanFdKey, false);
-    q->setConfigurationParameter(QCanBusDevice::LoopbackKey, false);
+
+    bool open = m_device->open();
+    int bitrate = m_device->settings->getBaudrateFor(m_network);
+    int fdbitrate = m_device->settings->getFDBaudrateFor(m_network);
+    bool hasCanFD = false, hasloopback = false;
+    const CANFD_SETTINGS * canFD = m_device->settings->getCANFDSettingsFor(m_network);
+    const CAN_SETTINGS * can = m_device->settings->getCANSettingsFor(m_network);
+
+    if (can && canFD)
+    {
+     hasCanFD = canFD->FDMode!= NO_CANFD;
+     hasloopback = can->Mode & LOOPBACK;
+     reportSettings(can,canFD);
+    }
+
+    m_device->close();
+
+
+    if (bitrate < 0)
+        q->setConfigurationParameter(QCanBusDevice::UserKey+1, true); //Omit configuration ...
+
+    q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate); // standard BitRate
+    q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
+    q->setConfigurationParameter(QCanBusDevice::CanFdKey, hasCanFD);
+    q->setConfigurationParameter(QCanBusDevice::LoopbackKey, hasloopback);
 }
 
 void IcsNeoCanBackendPrivate::enableWriteNotification(bool enable)
@@ -228,7 +264,7 @@ void IcsNeoCanBackendPrivate::startWrite()
     const QByteArray payload = frame.payload();
 
     auto msg                 = std::make_shared<icsneo::CANMessage>();
-    msg->network             = m_netID;
+    msg->network             = m_network.getNetID();
     msg->arbid               = frame.frameId();
     msg->isRemote            = frame.frameType() == QCanBusFrame::RemoteRequestFrame;
     msg->isCANFD             = m_hasFD;
@@ -309,7 +345,7 @@ void IcsNeoCanBackendPrivate::resetController()
 QCanBusFrame IcsNeoCanBackendPrivate::interpretFrame( icsneo::CANMessage * msg )
 {
     if (!(icsneo::Network::Type::CAN == msg->network.getType() &&
-          msg->network.getNetID() == m_netID ) )
+          msg->network.getNetID() == m_network.getNetID() ) )
         return QCanBusFrame(QCanBusFrame::InvalidFrame);
 
     QByteArray data;
@@ -338,8 +374,18 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
 {
     Q_Q(IcsNeoCanBackend);
 
-    if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::EventWarning )
+    bool omitConfig = q->configurationParameter(QCanBusDevice::UserKey+1).toBool();
+    if (omitConfig)
+    {
+        q->setError("Configuration ommited - using device defaults",QCanBusDevice::ConfigurationError);
         return QCanBusDevice::CanBusStatus::Warning;
+    }
+
+    if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::EventWarning )
+    {
+        q->setError(QString::fromStdString(icsneo::GetLastError().describe()), QCanBusDevice::ConfigurationError);
+        return QCanBusDevice::CanBusStatus::Warning;
+    }
 
     if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::Error )
     {
@@ -382,14 +428,17 @@ IcsNeoCanBackend::IcsNeoCanBackend(const QString &name, QObject *parent) :
     d_ptr(new IcsNeoCanBackendPrivate(this))
 {
     Q_D(IcsNeoCanBackend);
-
+    d_ptr->m_device = IcsNeoCanBackendPrivate::m_devices[name];
     d->setupChannel(name);
     d->setupDefaultConfigurations();
     std::function<void()> f = std::bind(&IcsNeoCanBackend::resetController, this);
     setResetControllerFunction(f);
     std::function<CanBusStatus()> g = std::bind(&IcsNeoCanBackend::busStatus, this);
     setCanBusStatusGetter(g);
-    d_ptr->m_device = IcsNeoCanBackendPrivate::m_devices[name];
+
+
+
+
 }
 
 IcsNeoCanBackend::~IcsNeoCanBackend()
