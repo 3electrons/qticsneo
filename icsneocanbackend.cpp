@@ -82,6 +82,7 @@ bool IcsNeoCanBackendPrivate::setupDevice()
                            CANFD_SETTINGS * canFD = m_device->settings->getMutableCANFDSettingsFor(m_network);
                            q->configurationParameter(ParameterIsoFDKey).toBool() ?
                               canFD->FDMode = CANFD_BRS_ENABLED_ISO : canFD->FDMode = CANFD_BRS_ENABLED;
+
                         }
             else        m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
 
@@ -451,10 +452,6 @@ IcsNeoCanBackend::IcsNeoCanBackend(const QString &name, QObject *parent) :
     setResetControllerFunction(f);
     std::function<CanBusStatus()> g = std::bind(&IcsNeoCanBackend::busStatus, this);
     setCanBusStatusGetter(g);
-
-
-
-
 }
 
 IcsNeoCanBackend::~IcsNeoCanBackend()
