@@ -197,30 +197,12 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
     return true;
 }
 
-void reportSettings(const CAN_SETTINGS * can, const CANFD_SETTINGS * canFD)
-{
-  qDebug() << "----- CAN SETTINGS -----" ;
-  qDebug() << "Mode:" << can->Mode;
-  qDebug() << "BaudRate:" << can->Baudrate;
-  qDebug() << "SetBaudRate:" << can->SetBaudrate;
-  qDebug() << "BRP:" << can->BRP;
-  qDebug() << "auto_baud:" << can->auto_baud;
-
-  // msg->baudrateSwitch = data->header.BRS;
-
-  qDebug() << "----- CANFD SETTINGS -----" ;
-  qDebug() << "FDMode:" << canFD->FDMode;
-  qDebug() << "FDBaudRate:" << canFD->FDBaudrate;
-  qDebug() << "FDBRP:" << canFD->FDBRP;
-  qDebug() << "FDTDC:" << canFD->FDTDC;
-
-}
-
 void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
 {
     Q_Q(IcsNeoCanBackend);
 
     bool open = m_device->open();
+    Q_UNUSED(open);
     int bitrate = m_device->settings->getBaudrateFor(m_network);
     int fdbitrate = m_device->settings->getFDBaudrateFor(m_network);
     bool hasCanFD = false, hasloopback = false , hasIso = false;
@@ -232,7 +214,6 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
      hasCanFD = canFD->FDMode!= NO_CANFD;
      hasIso = CANFD_BRS_ENABLED_ISO == canFD->FDMode;
      hasloopback = can->Mode & LOOPBACK;
-     reportSettings(can,canFD);
      q->setConfigurationParameter(ParameterOmitKey, false);
     }
     else
@@ -325,7 +306,7 @@ void IcsNeoCanBackendPrivate::readAllReceivedMessages()
 void IcsNeoCanBackendPrivate::resetController()
 {
     Q_Q(IcsNeoCanBackend);
-    QString description = QString::fromStdString(m_device->describe());
+    QString description =   QString::fromStdString(m_device->describe()) + QString(" - %1").arg(typeid(*m_device).name());
     QString serial      = QString::fromStdString(m_device->getSerial());
 
     this->close();              // Close current connection
@@ -387,15 +368,17 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
 {
     Q_Q(IcsNeoCanBackend);
 
-    if (icsneo::GetLastError().getSeverity() == icsneo::APIEvent::Severity::Error )
-    {
-        q->setError(QString::fromStdString(icsneo::GetLastError().describe()), QCanBusDevice::ConfigurationError);
-        return QCanBusDevice::CanBusStatus::Error;
+    icsneo::APIEvent event = icsneo::GetLastError();
+    if (event.getDevice() == m_device.get() && event.getSeverity() == icsneo::APIEvent::Severity::Error)
+    {        
+          QString error = QString::fromStdString(event.describe());
+          q->setError(error, QCanBusDevice::ConfigurationError);
+          return QCanBusDevice::CanBusStatus::Error;
     }
 
     QStringList  warnings;
     for( auto & event : GetEvents(icsneo::EventFilter()) )
-       warnings <<  QString::fromStdString(event.describe());
+          warnings <<  QString::fromStdString(event.describe());
 
     if (q->configurationParameter(ParameterOmitKey).toBool())
        warnings << "Configuration ommited - using device defaults";
@@ -427,7 +410,7 @@ void IcsNeoCanBackendPrivate::interfaces( QList<QCanBusDeviceInfo> & list)
         int channels = device->getNetworkCountByType(icsneo::Network::Type::CAN);
         for (int channel = 0 ; channel < channels ; channel++)
         {
-            QString description =   QString::fromStdString(device->describe());
+            QString description =   QString::fromStdString(device->describe()) + QString(" - %1").arg(typeid(*device).name());
             QString serial      = QString::fromStdString(device->getSerial());
             QCanBusDeviceInfo info = IcsNeoCanBackend::createDeviceInfo(serial, description, i, channel);
             m_devices[info.name()] = device;
