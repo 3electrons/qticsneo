@@ -54,7 +54,7 @@ The dependencies are as follows:
 ## Changelog 
 ### Release 2021.06.25
 - Added info to description what kind of driver is used to distinguish USB vs ETH 
-- Ignoring getLastError() for devices devices that are not related to current device. findAll - left single error on list of errors for device that does not exist anymore. Getting info about this device causes liicsneo to crash
+- Ignoring getLastError() in busStatus() that are not related to current device.  icsneo::FindAllDevices() - left single error on list of errors for device that does not exist anymore because of autoprobe for each type of supported devices. Getting full info about this error causes libicsneo to crash.
 
 
 ### Release 2021.06.15 
