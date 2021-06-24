@@ -24,6 +24,14 @@ make
 Build plugin will be genterated into plugins/canbus directory. 
 The simples way to test it, is use it against [serialbus/can](https://doc.qt.io/qt-5/qtserialbus-can-example.html) example from Qt/Examples directory in Qt SDK. 
 
+
+## PCAP 
+On Linux to make libics able to dectect ethernet devices possibly you
+may need to use command 
+''' 
+sudo setcap cap_net_raw,cap_net_admin=eip <your program name> 
+''' 
+
 ## Dependencies 
 ### Windows
 The dependencies are as follows:
@@ -43,12 +51,18 @@ The dependencies are as follows:
 - Bitrate settings under windows sets it to 20000 - reagardles of value. Do not know why - at the moment.
 
 ## Changelog 
+### Release 2021.06.25
+- Added info to description what kind of driver is used to distinguish USB vs ETH 
+- Ignoring getLastError() for devices devices that are not related to current device. findAll - left single error on list of errors for device that does not exist anymore. Getting info about this device causes liicsneo to crash
+
+
 ### Release 2021.06.15 
 - Added channels listed as CANx.y where X is Interpids device and Y is Network/Channel number on device such as HSCAN1, HSCANFD2 
 - Added CANFD support 
 - Shadow buildng works 
 - Verification of bitrate is done by libicsneo - returning nice error messages 
 - Added License file
+
 
 ### Release 2021.06.12 
 - Proof of concept - basic functionality. 
