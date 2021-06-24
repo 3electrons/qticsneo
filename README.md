@@ -26,11 +26,12 @@ The simples way to test it, is use it against [serialbus/can](https://doc.qt.io/
 
 
 ## PCAP 
-On Linux to make libics able to dectect ethernet devices possibly you
-may need to use command 
-''' 
-sudo setcap cap_net_raw,cap_net_admin=eip <your program name> 
-''' 
+On Linux to be able to dectect ethernet devices, you may need to use setcap (based on: https://askubuntu.com/questions/530920/tcpdump-permissions-problem)
+
+```bash
+sudo setcap cap_net_raw,cap_net_admin=eip <your program name>
+```
+
 
 ## Dependencies 
 ### Windows
