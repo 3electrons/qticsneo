@@ -381,8 +381,8 @@ QCanBusDevice::CanBusStatus IcsNeoCanBackendPrivate::busStatus()
     for( auto & event : GetEvents(icsneo::EventFilter()) )
           warnings <<  QString::fromStdString(event.describe());
 
-    if (q->configurationParameter(ParameterOmitKey).toBool())
-       warnings << "Configuration ommited - using device defaults";
+   // if (q->configurationParameter(ParameterOmitKey).toBool())
+   //    warnings << "Configuration ommited - using device defaults";
 
     if (!warnings.isEmpty())
     {
