@@ -6,6 +6,7 @@
 #include "icsneocanbackend.h"
 #include "icsneocanbackend_p.h"
 #include "icsneo/icsneocpp.h"
+#include "include/qticsneo_keys.h"
 
 #include <QtSerialBus/qcanbusdevice.h>
 
@@ -16,11 +17,10 @@
 #include <QtCore/qregularexpression.h>
 #include <QtCore/qtimer.h>
 
+
 QT_BEGIN_NAMESPACE
 Q_DECLARE_LOGGING_CATEGORY(QT_CANBUS_PLUGINS_ICSNEOCAN)
 
-#define ParameterOmitKey  (QCanBusDevice::UserKey + 1)    // Omit process of configuration of device
-#define ParameterIsoFDKey  (QCanBusDevice::UserKey + 2)   // Set CANFD in ISO mode
 
 class OutgoingEventNotifier : public QTimer
 {
@@ -60,34 +60,52 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 bool IcsNeoCanBackendPrivate::setupDevice()
 {
     Q_Q(IcsNeoCanBackend);
-    bool omitConfig = q->configurationParameter(ParameterOmitKey).toBool();
 
-    if (omitConfig)
-        return true;
-
+    QVariant value;
     bool res = true;
-    int bitrate      = q->configurationParameter(QCanBusDevice::BitRateKey).toInt();
-    int canbitrate   = q->configurationParameter(QCanBusDevice::DataBitRateKey).toInt();
-    bool loopback    = q->configurationParameter(QCanBusDevice::LoopbackKey).toBool();
 
-    loopback ?  m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = LOOPBACK :
-                m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = NORMAL;
 
-    if (res)            res &= m_device->settings->setBaudrateFor(m_network.getNetID(), bitrate)      && m_device->settings->apply();
-    if (res)
+    // Loopback
+    value = q->configurationParameter(QCanBusDevice::LoopbackKey);
+    if (value.isValid() && res)
+        value.toBool() ?  m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = LOOPBACK :
+                    m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = NORMAL;
+
+    // BitRate
+    value = q->configurationParameter(QCanBusDevice::BitRateKey);
+    if (value.isValid() && res)
+        res &= m_device->settings->setBaudrateFor(m_network.getNetID(), value.toInt())      && m_device->settings->apply();
+
+    // CanFD Settings
+    value = q->configurationParameter(QCanBusDevice::CanFdKey);
+    if (value.toBool() && res)
     {
-        if (m_hasFD)   {
-                          res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), canbitrate) ;
-                           /*  NO_CANFD = 0 , CANFD_ENABLED=1, CANFD_BRS_ENABLED=2, CANFD_ENABLED_ISO=3, CANFD_BRS_ENABLED_ISO=4 */
-                           CANFD_SETTINGS * canFD = m_device->settings->getMutableCANFDSettingsFor(m_network);
-                           q->configurationParameter(ParameterIsoFDKey).toBool() ?
-                              canFD->FDMode = CANFD_BRS_ENABLED_ISO : canFD->FDMode = CANFD_BRS_ENABLED;
+         /*  NO_CANFD = 0 , CANFD_ENABLED=1, CANFD_BRS_ENABLED=2, CANFD_ENABLED_ISO=3, CANFD_BRS_ENABLED_ISO=4 */
+         CANFD_SETTINGS * canFD = m_device->settings->getMutableCANFDSettingsFor(m_network);
 
-                        }
-            else        m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
+         // Iso
+         value =  q->configurationParameter(ParameterIsoKey);
+         if (value.isValid() && res)
+            value.toBool() ? canFD->FDMode = CANFD_BRS_ENABLED_ISO : canFD->FDMode = CANFD_BRS_ENABLED;
+         res&=m_device->settings->apply();
 
-        res &=m_device->settings->apply();
-    }
+         // FD-Bitrate
+         value = q->configurationParameter(QCanBusDevice::DataBitRateKey);
+         if (value.isValid() && res)
+              res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), value.toInt())  ;
+         res&=m_device->settings->apply();
+
+         // Termination
+         value = q->configurationParameter(ParameterTerminationKey);
+         if (value.isValid() && res && m_device->settings->canTerminationBeEnabledFor(m_network))
+                m_device->settings->setTerminationFor(m_network,value.toBool());
+         res&=m_device->settings->apply();
+     }
+      else
+         m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
+
+      res &=m_device->settings->apply();
+
     return res;
 }
 
@@ -153,8 +171,10 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
     {
         case QCanBusDevice::BitRateKey:       return true;
         case QCanBusDevice::DataBitRateKey:   return true;
-        case QCanBusDevice::CanFdKey:        {  m_hasFD = value.toBool();  return true; }
-        case QCanBusDevice::LoopbackKey:       return true;
+        case QCanBusDevice::CanFdKey:         return true;
+        case QCanBusDevice::LoopbackKey:      return true;
+        case ParameterIsoKey :                return true;
+        case ParameterTerminationKey:         return true;
         case QCanBusDevice::ReceiveOwnKey:
         {
             if (Q_UNLIKELY(q->state() != QCanBusDevice::UnconnectedState))
@@ -165,8 +185,6 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
             }
             return true;
         }
-        case ParameterOmitKey :       return true;  // Omit Config parameter
-        case ParameterIsoFDKey :       return true;  // Omit Config parameter
         default:
         {
             q->setError(IcsNeoCanBackend::tr("Unsupported configuration key: %1").arg(key),
@@ -206,28 +224,32 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
     Q_UNUSED(open);
     int bitrate = m_device->settings->getBaudrateFor(m_network);
     int fdbitrate = m_device->settings->getFDBaudrateFor(m_network);
-    bool hasCanFD = false, hasloopback = false , hasIso = false;
+
     const CANFD_SETTINGS * canFD = m_device->settings->getCANFDSettingsFor(m_network);
     const CAN_SETTINGS * can = m_device->settings->getCANSettingsFor(m_network);
 
     if (can && canFD)
     {
-     hasCanFD = canFD->FDMode!= NO_CANFD;
-     hasIso = CANFD_BRS_ENABLED_ISO == canFD->FDMode;
-     hasloopback = can->Mode & LOOPBACK;
-     q->setConfigurationParameter(ParameterOmitKey, false);
+     bool hasloopback = can->Mode & LOOPBACK;
+     q->setConfigurationParameter(QCanBusDevice::LoopbackKey, hasloopback);
+
+     bool hasCanFD = canFD->FDMode!= NO_CANFD;
+     q->setConfigurationParameter(QCanBusDevice::CanFdKey, hasCanFD);
+
+     bool hasIso = CANFD_BRS_ENABLED_ISO & canFD->FDMode;
+     q->setConfigurationParameter(ParameterIsoKey, hasIso);
+
+     if (m_device->settings->canTerminationBeEnabledFor(m_network))
+     {
+        bool hasTermination = m_device->settings->isTerminationEnabledFor(m_network).value();
+        q->setConfigurationParameter(ParameterTerminationKey, hasTermination);
+     }
+
+     q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate);       // standard BitRate
+     q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
+
     }
-    else
-     q->setConfigurationParameter(ParameterOmitKey, true); // no data try to use default settings
-
     m_device->close();
-
-    //Omit configuration if not able to determine current config
-    q->setConfigurationParameter(ParameterIsoFDKey, hasIso);     //Omit configuration if not able to determine current config
-    q->setConfigurationParameter(QCanBusDevice::BitRateKey, bitrate);       // standard BitRate
-    q->setConfigurationParameter(QCanBusDevice::DataBitRateKey, fdbitrate);
-    q->setConfigurationParameter(QCanBusDevice::CanFdKey, hasCanFD);
-    q->setConfigurationParameter(QCanBusDevice::LoopbackKey, hasloopback);
 }
 
 void IcsNeoCanBackendPrivate::enableWriteNotification(bool enable)

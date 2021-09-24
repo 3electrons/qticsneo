@@ -94,7 +94,8 @@ public:
 
     int m_messageCallbackId = 0;
     bool m_hasFD = false;
-    bool m_omitSetting = false;
+    bool m_hasIso = false;
+    bool m_hasTermination = false;
 };
 
 QT_END_NAMESPACE
