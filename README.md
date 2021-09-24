@@ -52,10 +52,15 @@ The dependencies are as follows:
 - Bitrate settings under windows sets it to 20000 - reagardles of value. Do not know why - at the moment.
 
 ## Changelog 
+### Release 2021.09.25
+- Removed config key ParameterOmitKey as (QCanBusDevice::UserKey +1) - now any key set to QVariant() will be omitted in device settings update. 
+- Added config key ParameterIsoKey (QCanBusDevice::UserKey+1) - to support ISO for CAN-FD 
+- Added config key ParameterTerminationKey (QCanBusDevice::UserKey+2) - to add support for Termination. 
+
+
 ### Release 2021.06.25
 - Added info to description what kind of driver is used to distinguish USB vs ETH 
 - Ignoring getLastError() in busStatus() that are not related to current device.  icsneo::FindAllDevices() - left single error on list of errors for device that does not exist anymore because of autoprobe for each type of supported devices. Getting full info about this error causes libicsneo to crash.
-
 
 ### Release 2021.06.15 
 - Added channels listed as CANx.y where X is Interpids device and Y is Network/Channel number on device such as HSCAN1, HSCANFD2 
