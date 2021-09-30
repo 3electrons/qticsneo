@@ -56,25 +56,33 @@ IcsNeoCanBackendPrivate::IcsNeoCanBackendPrivate(IcsNeoCanBackend *q) :
 }
 
 
-
 bool IcsNeoCanBackendPrivate::setupDevice()
 {
     Q_Q(IcsNeoCanBackend);
+    if(!m_device)
+        return false;
+
+    if (!m_device->settings->refresh())
+        resetController();
 
     QVariant value;
     bool res = true;
 
-
     // Loopback
     value = q->configurationParameter(QCanBusDevice::LoopbackKey);
     if (value.isValid() && res)
-        value.toBool() ?  m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = LOOPBACK :
-                    m_device->settings->getMutableCANSettingsFor(m_network.getNetID())->Mode = NORMAL;
+    {
+        CAN_SETTINGS * set = m_device->settings->getMutableCANSettingsFor(m_network);
+        if (set)
+           value.toBool() ? set->Mode = LOOPBACK : set->Mode = NORMAL;
+        else
+            res = false;
+    }
 
     // BitRate
     value = q->configurationParameter(QCanBusDevice::BitRateKey);
     if (value.isValid() && res)
-        res &= m_device->settings->setBaudrateFor(m_network.getNetID(), value.toInt())      && m_device->settings->apply();
+        res &= m_device->settings->setBaudrateFor(m_network, value.toInt()) ;
 
     // CanFD Settings
     value = q->configurationParameter(QCanBusDevice::CanFdKey);
@@ -83,28 +91,31 @@ bool IcsNeoCanBackendPrivate::setupDevice()
          /*  NO_CANFD = 0 , CANFD_ENABLED=1, CANFD_BRS_ENABLED=2, CANFD_ENABLED_ISO=3, CANFD_BRS_ENABLED_ISO=4 */
          CANFD_SETTINGS * canFD = m_device->settings->getMutableCANFDSettingsFor(m_network);
 
+         if (!canFD)
+             res = false;
          // Iso
          value =  q->configurationParameter(ParameterIsoKey);
          if (value.isValid() && res)
             value.toBool() ? canFD->FDMode = CANFD_BRS_ENABLED_ISO : canFD->FDMode = CANFD_BRS_ENABLED;
-         res&=m_device->settings->apply();
+         //res&=m_device->settings->apply();
 
          // FD-Bitrate
          value = q->configurationParameter(QCanBusDevice::DataBitRateKey);
          if (value.isValid() && res)
-              res &= m_device->settings->setFDBaudrateFor(m_network.getNetID(), value.toInt())  ;
-         res&=m_device->settings->apply();
+              res &= m_device->settings->setFDBaudrateFor(m_network, value.toInt())  ;
+         //res&=m_device->settings->apply();
 
          // Termination
          value = q->configurationParameter(ParameterTerminationKey);
          if (value.isValid() && res && m_device->settings->canTerminationBeEnabledFor(m_network))
                 m_device->settings->setTerminationFor(m_network,value.toBool());
-         res&=m_device->settings->apply();
+         //res&=m_device->settings->apply();
      }
       else
-         m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
+      if (res) m_device->settings->getMutableCANFDSettingsFor(m_network)->FDMode = NO_CANFD;
 
-      res &=m_device->settings->apply();
+      value = q->configurationParameter(ParameterFlashKey);
+      if (res ) res &=m_device->settings->apply() ; // !value.toBool());
 
     return res;
 }
@@ -175,6 +186,7 @@ bool IcsNeoCanBackendPrivate::setConfigurationParameter(int key, const QVariant 
         case QCanBusDevice::LoopbackKey:      return true;
         case ParameterIsoKey :                return true;
         case ParameterTerminationKey:         return true;
+        case ParameterFlashKey:               return true;
         case QCanBusDevice::ReceiveOwnKey:
         {
             if (Q_UNLIKELY(q->state() != QCanBusDevice::UnconnectedState))
@@ -239,6 +251,8 @@ void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
      bool hasIso = CANFD_BRS_ENABLED_ISO & canFD->FDMode;
      q->setConfigurationParameter(ParameterIsoKey, hasIso);
 
+     q->setConfigurationParameter(ParameterFlashKey,false);
+
      if (m_device->settings->canTerminationBeEnabledFor(m_network))
      {
         bool hasTermination = m_device->settings->isTerminationEnabledFor(m_network).value();
@@ -281,7 +295,7 @@ void IcsNeoCanBackendPrivate::startWrite()
     const QByteArray payload = frame.payload();
 
     auto msg                 = std::make_shared<icsneo::CANMessage>();
-    msg->network             = m_network.getNetID();
+    msg->network             = m_network;
     msg->arbid               = frame.frameId();
     msg->isRemote            = frame.frameType() == QCanBusFrame::RemoteRequestFrame;
     msg->isCANFD             = m_hasFD;
@@ -328,11 +342,18 @@ void IcsNeoCanBackendPrivate::readAllReceivedMessages()
 
 void IcsNeoCanBackendPrivate::resetController()
 {
+
+    qCWarning(QT_CANBUS_PLUGINS_ICSNEOCAN, "Reseting controller");
+
     Q_Q(IcsNeoCanBackend);
     QString description =   QString::fromStdString(m_device->describe()) + QString(" - %1").arg(typeid(*m_device).name());
     QString serial      = QString::fromStdString(m_device->getSerial());
 
     this->close();              // Close current connection
+
+    m_device->settings->applyDefaults(); // setupd default settings
+    m_device->settings->apply();         // write into device EEPROM memory
+
     delete m_device.get();      // Delete current device
     m_device.reset();           // Reset variable
 
