@@ -213,7 +213,7 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
     const QRegularExpression re(QStringLiteral("can(\\d)\\.(\\d)"));
     const QRegularExpressionMatch match = re.match(interfaceName);
 
-    if (Q_LIKELY(match.hasMatch()))
+    if (Q_LIKELY(match.hasMatch()) && m_device)
     {
         device = quint8(match.captured(1).toUShort());
         channel = quint8(match.captured(2).toUShort());     
@@ -231,6 +231,9 @@ bool IcsNeoCanBackendPrivate::setupChannel(const QString &interfaceName)
 void IcsNeoCanBackendPrivate::setupDefaultConfigurations()
 {
     Q_Q(IcsNeoCanBackend);
+
+    if (!m_device)
+        return;
 
     bool open = m_device->open();
     Q_UNUSED(open);
