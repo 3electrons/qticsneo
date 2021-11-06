@@ -9,8 +9,8 @@ stages:
     stage: build
     script:
         - set PATH=%TOOLS%;%PATH% 
-        - qmake CONFIG+=release
-        - jom -j24        
+        - qmake -r CONFIG+=release
+        - jom -j56        
 
     artifacts:
         name: "qticsneocanbus_dll_%CI_RUNNER_TAGS%_Build%CI_PIPELINE_ID%"
@@ -23,9 +23,6 @@ build_qt5.15.2_MinGw_32:
     <<: *windows_build 
     tags: ["mingw_qt5.15.2"]
 
-build_qt5.14.2_MSVC:     
-    <<: *windows_build 
-    tags: ["msvc2017_64_qt5.14.2"]
 
  
         
