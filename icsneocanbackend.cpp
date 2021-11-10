@@ -66,7 +66,7 @@ bool IcsNeoCanBackendPrivate::setupDevice()
         resetController();
 
     QVariant value;
-    bool res = true;
+    bool res = m_device!=nullptr;
 
     // Loopback
     value = q->configurationParameter(QCanBusDevice::LoopbackKey);
@@ -130,6 +130,9 @@ bool IcsNeoCanBackendPrivate::open()
     bool res =  m_device->open();
     if (res) res &= setupDevice();
     if (res) res &= m_device->goOnline();
+
+    if (nullptr == m_device)
+        return false;
 
     if (!res)
     {
@@ -343,14 +346,20 @@ void IcsNeoCanBackendPrivate::readAllReceivedMessages()
     q->enqueueReceivedFrames(newFrames);
 }
 
+
 void IcsNeoCanBackendPrivate::resetController()
 {
+
+    auto uniqDevString =[=](const std::shared_ptr<icsneo::Device> & device ) {
+        QString str = QString::fromStdString(device->describe()) + QString(" - %1").arg(typeid(m_device).name());
+        str+= QString::fromStdString(device->getSerial());
+        return str;
+    };
 
     qCWarning(QT_CANBUS_PLUGINS_ICSNEOCAN, "Reseting controller");
 
     Q_Q(IcsNeoCanBackend);
-    QString description =   QString::fromStdString(m_device->describe()) + QString(" - %1").arg(typeid(*m_device).name());
-    QString serial      = QString::fromStdString(m_device->getSerial());
+    QString description = uniqDevString(m_device);
 
     this->close();              // Close current connection
 
@@ -364,15 +373,22 @@ void IcsNeoCanBackendPrivate::resetController()
     std::vector<std::shared_ptr<icsneo::Device>>  devices = icsneo::FindAllDevices();
     for (auto dev : devices)
     {
-        QString dev_description =   QString::fromStdString(dev->describe());
-        QString dev_serial      = QString::fromStdString(dev->getSerial());
+        QString dev_description =   uniqDevString(dev);
 
-       if (dev_description == description && dev_serial == serial)
+
+       if (dev_description == description )
        {
            m_device = dev ;
            dev.reset();
            break;
        }
+    }
+
+    if (nullptr == m_device )
+    {
+        q->setError(IcsNeoCanBackend::tr("Cannot reset controller. Try unplug and plug deivce again"),
+                    QCanBusDevice::UnknownError);
+        return;
     }
 
     // Resored opened state;
