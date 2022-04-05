@@ -411,6 +411,7 @@ QCanBusFrame IcsNeoCanBackendPrivate::interpretFrame( icsneo::CANMessage * msg )
 
     QCanBusFrame frame(msg->arbid, data);
 
+    //qDebug() << "Message timestamp:" << msg->timestamp << " Sec:" << msg->timestamp / 1000000 << "." << msg->timestamp % 1000000;
     frame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(msg->timestamp));
     frame.setExtendedFrameFormat(msg->isExtended);
     frame.setFlexibleDataRateFormat(msg->isCANFD);
@@ -550,7 +551,7 @@ bool IcsNeoCanBackend::open()
     Q_D(IcsNeoCanBackend);
     if (!d->open())
         return false;
-
+    setState(QCanBusDevice::ConnectingState);
     // Apply all stored configurations except bitrate and receive own,
     // because these cannot be applied after opening the device
     const QVector<int> keys = configurationKeys();
@@ -573,6 +574,7 @@ bool IcsNeoCanBackend::open()
 void IcsNeoCanBackend::close()
 {
     Q_D(IcsNeoCanBackend);
+    setState(QCanBusDevice::ClosingState);
     d->close();
     setState(QCanBusDevice::UnconnectedState);
 }
